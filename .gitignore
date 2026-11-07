@@ -1,0 +1,36 @@
+node_modules/
+dist/
+playwright-report/
+test-results/
+*.local
+
+*.tsbuildinfo
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+!.env.sample
+secrets/
+credentials/
+.aws/
+*.pem
+*.key
+*.p12
+*.pfx
+.npmrc
+
+# Temporary files, caches, logs, and local tooling
+.cache/
+.vite/
+coverage/
+tmp/
+temp/
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
