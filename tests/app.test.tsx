@@ -1,39 +1,60 @@
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { expect, it } from "vitest";
+import { beforeEach, expect, it } from "vitest";
+import { openDB } from "idb";
 import App from "../src/app/App";
-it("offers an account-free writing path with an explicit privacy notice", async () => {
+import { Confirm } from "../src/components/ui";
+import userEvent from "@testing-library/user-event";
+beforeEach(async () => {
+  const db = await openDB("unsaid-encrypted", 1, {
+    upgrade(d) {
+      d.createObjectStore("vault");
+    },
+  });
+  await db.clear("vault");
+  db.close();
+});
+it("requires explicit vault setup and explains recovery and review limits", async () => {
   render(
     <MemoryRouter>
       <App />
     </MemoryRouter>,
   );
   expect(
-    screen.getByRole("heading", { name: /Some thoughts are easier/ }),
+    await screen.findByRole("button", { name: "Create your vault" }),
   ).toBeInTheDocument();
-  await userEvent.click(screen.getByRole("link", { name: "Let it out" }));
-  expect(
-    await screen.findByRole("textbox", { name: "Your thought" }),
-  ).toBeInTheDocument();
-  expect(screen.getByText("without encryption")).toBeInTheDocument();
-  expect(
-    screen.getByRole("button", { name: "Keep this thought" }),
-  ).toBeDisabled();
-});
-it("clearly identifies later phases as unavailable", () => {
-  render(
-    <MemoryRouter initialEntries={["/letters"]}>
-      <App />
-    </MemoryRouter>,
+  expect(screen.getByLabelText("Choose a passphrase")).toHaveAttribute(
+    "type",
+    "password",
   );
   expect(
-    screen.getByRole("heading", { name: "Letters Never Sent" }),
+    screen.getByText(/Not independently security-reviewed/),
   ).toBeInTheDocument();
   expect(
-    screen.getByText(/not available in this foundation version/),
-  ).toBeInTheDocument();
-  expect(
-    screen.queryByRole("button", { name: /send/i }),
+    screen.queryByRole("textbox", { name: "Your thought" }),
   ).not.toBeInTheDocument();
+});
+it("uses a native accessible dialog for destructive confirmation", async () => {
+  HTMLDialogElement.prototype.showModal = function () {
+    this.setAttribute("open", "");
+  };
+  HTMLDialogElement.prototype.close = function () {
+    this.removeAttribute("open");
+  };
+  let canceled = false;
+  render(
+    <Confirm
+      title="Let this go?"
+      description="This cannot be undone."
+      onCancel={() => {
+        canceled = true;
+      }}
+      onConfirm={() => {}}
+    />,
+  );
+  expect(
+    screen.getByRole("dialog", { name: "Let this go?" }),
+  ).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  expect(canceled).toBe(true);
 });

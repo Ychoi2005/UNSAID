@@ -1,268 +1,246 @@
-import { useEffect, useRef, useState } from "react";
-import { Link, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import {
-  ArrowRight,
-  BookOpen,
-  HelpCircle,
-  Mail,
-  Moon,
-  Settings,
-  Shield,
-  Sparkles,
-  Stars,
-} from "lucide-react";
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import {
+  Link,
+  NavLink,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useBlocker,
+} from "react-router-dom";
+import { ArrowUpRight, LockKeyhole, Menu, X } from "lucide-react";
 import { MotionConfig } from "motion/react";
+import { VaultSession } from "../lib/storage/session";
+import { VaultProvider, useVault } from "./VaultContext";
+import Gate from "../features/vault/Gate";
 import Welcome from "../components/Welcome";
-import { PageHeader, PrivacyBanner } from "../components/common";
 import Editor from "../features/writing/Editor";
-import Thoughts from "../features/writing/Thoughts";
-
-const nav = [
-  { to: "/", label: "The Quiet Room", icon: Moon },
-  { to: "/thoughts", label: "My thoughts", icon: BookOpen },
+import Collection from "../features/archive/Collection";
+const Constellation = lazy(
+  () => import("../features/constellation/Constellation"),
+);
+import { Confirm } from "../components/ui";
+const Perspective = lazy(() => import("../features/reflection/Perspective"));
+const Settings = lazy(() => import("../features/vault/Settings"));
+import Support from "../components/Support";
+const navigation = [
+  ["/", "The Quiet Room"],
+  ["/letters", "Letters Never Sent"],
+  ["/constellation", "Thought Constellation"],
+  ["/timeline", "Reflection Timeline"],
+  ["/perspectives", "Perspective Shift"],
+  ["/archive", "The Archive"],
+  ["/settings", "Privacy & Settings"],
 ];
-const future = [
-  { to: "/letters", label: "Letters Never Sent", icon: Mail },
-  { to: "/constellation", label: "Thought Constellation", icon: Stars },
-  { to: "/perspectives", label: "Perspective Shift", icon: Sparkles },
-];
-function App() {
-  const [animations, setAnimations] = useState(() => {
-    try {
-      return localStorage.getItem("unsaid-motion") !== "off";
-    } catch {
-      return false;
-    }
-  });
-  const location = useLocation();
-  const previousPath = useRef(location.pathname);
-  useEffect(() => {
-    if (previousPath.current !== location.pathname) {
-      document.querySelector<HTMLElement>("main")?.focus();
-      previousPath.current = location.pathname;
-    }
-  }, [location.pathname]);
+export default function App() {
+  const [session, setSession] = useState<VaultSession | null>(null);
+  const locked = useCallback(() => setSession(null), []);
+  if (!session) return <Gate onUnlock={setSession} />;
   return (
-    <MotionConfig reducedMotion={animations ? "user" : "always"}>
-      <div className={animations ? "app" : "app no-motion"}>
-        <a className="skip" href="#main">
+    <VaultProvider session={session} onLock={locked}>
+      <Shell onCleared={locked} />
+    </VaultProvider>
+  );
+}
+function Shell({ onCleared }: { onCleared: () => void }) {
+  const { motion, pending, error, unsaved, lock } = useVault();
+  const [menu, setMenu] = useState(false);
+  const [lockError, setLockError] = useState("");
+  const [discardLock, setDiscardLock] = useState(false);
+  const location = useLocation();
+  const previous = useRef(location.pathname);
+  useEffect(() => {
+    if (previous.current !== location.pathname) {
+      document.getElementById("main")?.focus();
+      previous.current = location.pathname;
+    }
+    setMenu(false);
+  }, [location.pathname]);
+  const writing = location.pathname.startsWith("/write/");
+  const blocker = useBlocker(writing && unsaved);
+  return (
+    <MotionConfig reducedMotion={motion ? "user" : "always"}>
+      <div
+        className={`app ${motion ? "" : "no-motion"} ${writing ? "is-writing" : ""}`}
+      >
+        <a href="#main" className="skip">
           Skip to content
         </a>
         <aside className="sidebar">
-          <Link className="brand" to="/">
-            UNSAID<span>A LITTLE ROOM FOR YOU</span>
+          <Link to="/" className="wordmark">
+            UNSAID<span className="wordmark-dot">.</span>
           </Link>
-          <div className="mobile-utilities">
-            <Link to="/settings" aria-label="Your space, your way">
-              <Settings size={18} />
-            </Link>
-            <Link to="/support" aria-label="A little support">
-              <HelpCircle size={18} />
-            </Link>
-          </div>
-          <div className="nav-caption">YOUR SPACE</div>
-          <nav aria-label="Main navigation">
-            {nav.map(({ to, label, icon: Icon }) => (
-              <NavLink key={to} to={to} end>
-                <Icon size={18} />
-                {label}
-              </NavLink>
-            ))}
-            <div className="nav-divider" />
-            {future.map(({ to, label, icon: Icon }) => (
-              <NavLink key={to} to={to}>
-                <Icon size={18} />
-                {label}
-                <span className="soon-dot" title="Coming in a later phase" />
-              </NavLink>
-            ))}
-          </nav>
-          <div className="sidebar-bottom">
-            <div className="privacy-note">
-              <Shield size={17} />
-              <div>
-                Only on this browser<span>Early prototype · not encrypted</span>
-              </div>
+          <span className="sidebar-subtitle">A PLACE FOR WHAT’S YOURS.</span>
+          <button
+            className="mobile-menu icon-button"
+            aria-label={menu ? "Close navigation" : "Open navigation"}
+            aria-expanded={menu}
+            onClick={() => setMenu(!menu)}
+          >
+            {menu ? <X size={22} /> : <Menu size={22} />}
+          </button>
+          <div className={`sidebar-content ${menu ? "open" : ""}`}>
+            <div className="nav-label">YOUR SPACE</div>
+            <nav aria-label="Main navigation">
+              {navigation.map(([path, label], i) => (
+                <NavLink to={path} end key={path} aria-label={label}>
+                  <span className="nav-index" aria-hidden="true">
+                    0{i + 1}
+                  </span>
+                  <span>{label}</span>
+                  <span className="nav-active-mark" aria-hidden="true">
+                    —
+                  </span>
+                </NavLink>
+              ))}
+            </nav>
+            <div className="sidebar-bottom">
+              <button
+                className="lock-button"
+                disabled={!!pending}
+                onClick={() => {
+                  if (unsaved) {
+                    setDiscardLock(true);
+                    return;
+                  }
+                  void lock().catch((e) => setLockError(e.message));
+                }}
+              >
+                <LockKeyhole size={15} />
+                {pending ? "Saving…" : "Lock your space"}
+                <ArrowUpRight size={13} />
+              </button>
+              <Link className="support-link" to="/support">
+                A little support
+              </Link>
+              <span className="local-caption">LOCAL. ENCRYPTED. YOURS.</span>
+              <p className="review-caption">
+                Prototype · independent
+                <br />
+                security review still required.
+              </p>
             </div>
-            <NavLink to="/settings">
-              <Settings size={17} />
-              Your space, your way
-            </NavLink>
-            <NavLink to="/support">
-              <HelpCircle size={17} />A little support
-            </NavLink>
-          </div>
-          <div className="sidebar-quote">
-            Some things just need
-            <br />
-            somewhere to exist.<span>✧</span>
           </div>
         </aside>
-        <main id="main" tabIndex={-1}>
+        <main
+          id="main"
+          tabIndex={-1}
+          className={location.pathname === "/constellation" ? "night-main" : ""}
+        >
+          {(error || lockError) && (
+            <div className="global-error" role="alert">
+              {error || lockError}
+              <span>
+                {unsaved
+                  ? "Keep this page open until your changes are saved."
+                  : "Existing saved data has not been replaced."}
+              </span>
+            </div>
+          )}
           <Routes>
-            <Route path="/" element={<Welcome animations={animations} />} />
-            <Route path="/write" element={<Editor />} />
-            <Route path="/thoughts" element={<Thoughts />} />
+            <Route path="/" element={<Welcome />} />
+            <Route
+              path="/write/:id"
+              element={<Editor key={location.pathname} />}
+            />
+            <Route path="/letters" element={<Collection mode="letters" />} />
+            <Route
+              path="/constellation"
+              element={
+                <Suspense
+                  fallback={
+                    <section className="page" role="status">
+                      Opening your sky…
+                    </section>
+                  }
+                >
+                  <Constellation />
+                </Suspense>
+              }
+            />
+            <Route path="/timeline" element={<Collection mode="timeline" />} />
+            <Route
+              path="/perspectives"
+              element={
+                <Suspense
+                  fallback={
+                    <section className="page" role="status">
+                      Opening reflection…
+                    </section>
+                  }
+                >
+                  <Perspective />
+                </Suspense>
+              }
+            />
+            <Route path="/archive" element={<Collection mode="archive" />} />
             <Route
               path="/settings"
               element={
-                <SettingsPage
-                  animations={animations}
-                  onChange={(value) => {
-                    setAnimations(value);
-                    try {
-                      localStorage.setItem(
-                        "unsaid-motion",
-                        value ? "on" : "off",
-                      );
-                    } catch {
-                      /* Preference remains active for this visit when storage is unavailable. */
-                    }
-                  }}
-                />
+                <Suspense
+                  fallback={
+                    <section className="page" role="status">
+                      Opening settings…
+                    </section>
+                  }
+                >
+                  <Settings onCleared={onCleared} />
+                </Suspense>
               }
             />
             <Route path="/support" element={<Support />} />
-            {future.map((item) => (
-              <Route
-                key={item.to}
-                path={item.to}
-                element={<ComingSoon path={item.to} />}
-              />
-            ))}
+            <Route
+              path="/thoughts"
+              element={<Navigate to="/archive" replace />}
+            />
+            <Route
+              path="/write"
+              element={
+                <Navigate to={`/write/${crypto.randomUUID()}`} replace />
+              }
+            />
             <Route
               path="*"
               element={
                 <section className="page">
                   <h1>A quiet wrong turn.</h1>
-                  <Link className="button" to="/">
+                  <Link className="text-button" to="/">
                     Return to your room
+                    <ArrowUpRight size={16} />
                   </Link>
                 </section>
               }
             />
           </Routes>
         </main>
+        {blocker.state === "blocked" && (
+          <Confirm
+            title="Leave with unsaved changes?"
+            description="A save failed. Your last changes may only exist on this screen. Copy them or cancel and try saving again before leaving."
+            label="Leave & discard unsaved changes"
+            onCancel={() => blocker.reset()}
+            onConfirm={() => blocker.proceed()}
+          />
+        )}
+        {discardLock && (
+          <Confirm
+            title="Lock with unsaved changes?"
+            description="A save failed. Copy any unsaved writing first. Locking will discard unsaved changes still on screen; already saved writing remains in the vault."
+            label="Discard unsaved changes & lock"
+            onCancel={() => setDiscardLock(false)}
+            onConfirm={() =>
+              void lock(true).catch((e) => setLockError(e.message))
+            }
+          />
+        )}
       </div>
     </MotionConfig>
   );
 }
-function SettingsPage({
-  animations,
-  onChange,
-}: {
-  animations: boolean;
-  onChange: (value: boolean) => void;
-}) {
-  return (
-    <section className="page prose">
-      <PageHeader
-        eyebrow="ON YOUR TERMS"
-        title="Your space, your way."
-        description="A few small things to make this place yours."
-      />
-      <div className="setting-row">
-        <div>
-          <h2>Decorative motion</h2>
-          <p>
-            Gentle stars and soft transitions. Your device’s reduced-motion
-            preference is always respected.
-          </p>
-        </div>
-        <input
-          aria-label="Decorative motion"
-          type="checkbox"
-          checked={animations}
-          onChange={(e) => onChange(e.target.checked)}
-        />
-      </div>
-      <h2>Where your words live</h2>
-      <p>
-        Thoughts and drafts stay in IndexedDB on this browser and device. There
-        are no accounts, analytics, external fonts, AI services, or cloud
-        backups.
-      </p>
-      <PrivacyBanner />
-      <h2>What’s still to come</h2>
-      <p>
-        Passphrase protection, encryption, data export and import, and clearing
-        all data are planned for Phase 3. This version is for non-sensitive
-        prototype use. Individual thoughts can be deleted from My thoughts;
-        unfinished drafts can be discarded in the editor.
-      </p>
-      <p>
-        Other people with access to this browser profile, extensions, or
-        compromised software may be able to read your writing. Browser storage
-        can be cleared or evicted. Deletion is not a guarantee of forensic
-        erasure.
-      </p>
-    </section>
-  );
-}
-function Support() {
-  return (
-    <section className="page prose">
-      <PageHeader
-        eyebrow="A LITTLE SUPPORT"
-        title="You don’t have to carry it alone."
-        description="UNSAID is a writing space, not therapy or an emergency service."
-      />
-      <p>
-        You can pause or leave whenever you want. Nothing here diagnoses,
-        monitors, or analyses your writing.
-      </p>
-      <h2>If you need immediate help</h2>
-      <p>
-        If you or someone else is in immediate danger, contact your local
-        emergency services.
-      </p>
-      <p>
-        In Australia, call Lifeline on <a href="tel:131114">13 11 14</a> or
-        visit{" "}
-        <a href="https://www.lifeline.org.au/" target="_blank" rel="noreferrer">
-          Lifeline
-        </a>
-        . In the US or Canada, call or text <a href="tel:988">988</a>. For other
-        countries, visit{" "}
-        <a href="https://findahelpline.com/" target="_blank" rel="noreferrer">
-          Find a Helpline
-        </a>
-        .
-      </p>
-      <p>
-        External support websites have their own privacy policies. They receive
-        no writing from UNSAID.
-      </p>
-      <Link className="button" to="/">
-        Return to your room
-        <ArrowRight size={16} />
-      </Link>
-    </section>
-  );
-}
-function ComingSoon({ path }: { path: string }) {
-  const item = future.find((i) => i.to === path)!;
-  return (
-    <section className="page coming-page">
-      <item.icon size={40} />
-      <div className="eyebrow">A LITTLE FURTHER DOWN THE PATH</div>
-      <h1>{item.label}</h1>
-      <p>
-        {path === "/letters"
-          ? "Some words are meant to be written, not delivered."
-          : path === "/constellation"
-            ? "Every thought has its place in your universe."
-            : "Sometimes, another question opens another door."}
-      </p>
-      <div className="future-note">
-        This space is still taking shape. It is not available in this foundation
-        version.
-      </div>
-      <Link className="button" to="/write">
-        For now, let it out
-        <ArrowRight size={16} />
-      </Link>
-    </section>
-  );
-}
-export default App;

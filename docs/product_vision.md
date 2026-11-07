@@ -1,5 +1,7 @@
-# A private place for things left unsaid
+# A private space for things left unsaid
 
-UNSAID is intended for adults who want to write without an audience, judgement, a productivity goal or an expected response. It is a reflection tool, not treatment or a crisis-response service.
+UNSAID gives adults a place to write without an audience, judgement, productivity target or required response. Not every thought needs an audience; not every feeling needs an explanation. It is for personal reflection, not medical treatment or emergency support.
 
-The product makes room for unfinished thoughts. Saving, revisiting and letting go stay under the writer's control. No streaks, scores, mood classification, automatic resurfacing or forced positivity are planned. No user research, adoption numbers or clinical outcomes are claimed.
+Autonomy shapes the flow: title/tag fields are optional, prompts can be dismissed, connections are manually authored, old writing is revisited only by choice, and deletion requires consent. No scores, forced positivity, engagement streaks, public sharing or automated psychological inference are included.
+
+The local vault is central rather than decorative. The product explains its device/origin boundaries, lost-passphrase risk, backup responsibility and limits against hostile software. This is still an independently unreviewed local prototype, not an assurance of complete secrecy or suitability for sensitive information.
